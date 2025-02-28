@@ -36,10 +36,10 @@ async def websocket_endpoint(websocket: WebSocket):
             user_data = json.loads(data)
 
             # Extract details
-            unique_id = user_data["unique_id"]
-            name = user_data["name"]
+            uniqueIDid = user_data["unique_id"]
+            room = user_data["room"]
             floor = user_data["floor"]
-            room_no = user_data["room_no"]
+            status = user_data["status"]
 
             # Store in CSV
             new_data = pd.DataFrame([[unique_id, name, floor, room_no]], 
