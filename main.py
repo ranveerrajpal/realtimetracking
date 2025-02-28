@@ -7,20 +7,24 @@ import os
 
 app = FastAPI()
 
-# Mount static files for JavaScript & CSS
+# Mount static files (for JavaScript & CSS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Allowed Floor
 ALLOWED_FLOOR = 1
 csv_file = "data.csv"
 
-# Ensure CSV exists
+# Ensure CSV file exists
 if not os.path.exists(csv_file):
     df = pd.DataFrame(columns=["Unique ID", "Name", "Floor", "Room No"])
     df.to_csv(csv_file, index=False)
 
-# Load HTML
-with open("templates/index.html", "r") as file:
+# Load HTML file (Ensure `index.html` exists in the root)
+html_file_path = "index.html"
+if not os.path.exists(html_file_path):
+    raise FileNotFoundError(f"{html_file_path} not found!")
+
+with open(html_file_path, "r") as file:
     html_content = file.read()
 
 @app.get("/")
@@ -32,25 +36,27 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
+            # Receive data
             data = await websocket.receive_text()
             user_data = json.loads(data)
 
             # Extract details
-            uniqueID = user_data["uniqueID"]
-            userName = user_data["userName"]
-            room = user_data["room"]
-            floor = user_data["floor"]
-            status = user_data["status"]
+            unique_id = user_data.get("uniqueID", "N/A")
+            name = user_data.get("userName", "Unknown")
+            room_no = user_data.get("room", "N/A")
+            floor = user_data.get("floor", 0)
+            status = user_data.get("status", 0)
 
-            # Store in CSV
+            # Store data in CSV
             new_data = pd.DataFrame([[unique_id, name, floor, room_no]], 
                                     columns=["Unique ID", "Name", "Floor", "Room No"])
             new_data.to_csv(csv_file, mode='a', header=False, index=False)
 
-            # Alert if unauthorized floor
-            user_data["alert"] = floor > ALLOWED_FLOOR
+            # Check for unauthorized floor access
+            alert_status = floor > ALLOWED_FLOOR
+            user_data["alert"] = alert_status
 
-            # Send updated data
+            # Send response back to client
             await websocket.send_json(user_data)
 
     except WebSocketDisconnect:
