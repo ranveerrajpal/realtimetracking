@@ -1,24 +1,19 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 import pandas as pd
-import json
-import os
 import datetime
 
 app = FastAPI()
 
-# CSV File for storing tracking data
-csv_file = "labour_tracking.csv"
-
-# Ensure CSV file exists
-if not os.path.exists(csv_file):
-    df = pd.DataFrame(columns=["uniqueID", "userName", "room", "floor", "status", "entry_time", "exit_time"])
-    df.to_csv(csv_file, index=False)
+# ✅ Initialize an empty DataFrame
+df = pd.DataFrame(columns=["uniqueID", "userName", "room", "floor", "status", "entry_time", "exit_time"])
 
 # ✅ Route to Submit Data
 @app.post("/submit-data")
 async def submit_data(data: dict):
-    """ Accepts JSON & stores worker entry/exit times automatically """
+    """ Accepts JSON & stores worker entry/exit times in a DataFrame """
+    global df  # Access the DataFrame globally
+
     try:
         uniqueID = data.get("uniqueID")
         userName = data.get("userName")
@@ -31,24 +26,21 @@ async def submit_data(data: dict):
         if None in [uniqueID, userName, room, floor, status]:
             raise HTTPException(status_code=400, detail="Missing required fields")
 
-        df = pd.read_csv(csv_file)
-
-        # Check if the worker already has an entry recorded
+        # Check if the worker already has an entry
         existing_entry = df[(df["uniqueID"] == uniqueID) & (df["exit_time"].isna())]
 
         if status.lower() == "enter":
             if existing_entry.empty:
                 # Add new entry with entry time
-                new_data = pd.DataFrame([[uniqueID, userName, room, floor, status, current_time, ""]], 
-                                        columns=["uniqueID", "userName", "room", "floor", "status", "entry_time", "exit_time"])
-                df = pd.concat([df, new_data], ignore_index=True)
+                new_entry = pd.DataFrame([[uniqueID, userName, room, floor, status, current_time, ""]], 
+                                         columns=df.columns)
+                df = pd.concat([df, new_entry], ignore_index=True)
 
         elif status.lower() == "exit":
             if not existing_entry.empty:
                 # Update the latest entry with exit time
                 df.loc[df["uniqueID"] == uniqueID, "exit_time"] = current_time
 
-        df.to_csv(csv_file, index=False)
         return {"message": f"Worker {status} recorded successfully"}
 
     except Exception as e:
@@ -57,14 +49,12 @@ async def submit_data(data: dict):
 # ✅ Retrieve Labour Data for Display
 @app.get("/get-labour-data")
 async def get_labour_data():
-    """ Fetch all labour tracking data """
-    if os.path.exists(csv_file):
-        df = pd.read_csv(csv_file)
-        if df.empty:
-            return {"message": "No data available"}
-        return {"labour_records": df.to_dict(orient="records")}
-    else:
-        raise HTTPException(status_code=404, detail="CSV file not found")
+    """ Fetch all worker tracking data from DataFrame """
+    global df  # Access the DataFrame globally
+    if df.empty:
+        return {"message": "No data available"}
+    
+    return {"labour_records": df.to_dict(orient="records")}
 
 # ✅ Serve HTML Page
 @app.get("/")
