@@ -20,7 +20,7 @@ if not os.path.exists(csv_file):
     df.to_csv(csv_file, index=False)
 
 # Load HTML file (Ensure `index.html` exists in the root)
-html_file_path = "index.html"
+html_file_path = "templates/index.html"
 if not os.path.exists(html_file_path):
     raise FileNotFoundError(f"{html_file_path} not found!")
 
