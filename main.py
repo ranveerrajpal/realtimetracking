@@ -52,6 +52,7 @@ async def home():
         <script>
             document.addEventListener("DOMContentLoaded", function () {
                 const tableBody = document.getElementById("tableBody");
+                const notificationBox = document.getElementById("notificationBox");
                 const ws = new WebSocket("wss://" + window.location.host + "/ws");
                 let receivedEntries = new Set(); // ✅ Store unique data
 
@@ -59,9 +60,17 @@ async def home():
                     let data = JSON.parse(event.data);
                     let entryKey = `${data.uniqueID}-${data.userName}-${data.room}-${data.floor}-${data.status}`; // Unique Key
 
+                    // ✅ Unauthorized Area Check
+                    let isUnauthorized = (data.userName.toLowerCase() === "nikhil" && (data.room === "Room 2" || data.floor == 2));
+
+                    if (isUnauthorized) {
+                        notificationBox.innerHTML = `<p style='color: red; font-weight: bold;'>⚠️ Alert: ${data.userName} entered an unauthorized area!</p>`;
+                    }
+
                     if (!receivedEntries.has(entryKey)) { // ✅ Only add if it's new
                         receivedEntries.add(entryKey);
-                        let row = `<tr>
+                        let rowColor = isUnauthorized ? "style='background-color: #ffcccc;'" : ""; // Highlight if unauthorized
+                        let row = `<tr ${rowColor}>
                             <td>${data.uniqueID}</td>
                             <td>${data.userName}</td>
                             <td>${data.room}</td>
@@ -80,10 +89,12 @@ async def home():
             table { width: 100%; border-collapse: collapse; }
             th, td { border: 1px solid black; padding: 8px; text-align: center; }
             th { background-color: lightgray; }
+            #notificationBox { font-size: 18px; margin-bottom: 15px; }
         </style>
     </head>
     <body>
         <h1>Live Labour Tracking</h1>
+        <div id="notificationBox"></div> <!-- ✅ Notification Box -->
         <table>
             <thead>
                 <tr>
