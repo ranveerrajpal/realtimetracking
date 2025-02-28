@@ -1,67 +1,45 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
-import pandas as pd
-import datetime
+import json
 
 app = FastAPI()
 
-# ✅ Persistent DataFrame using app state
-class DataStore:
-    df = pd.DataFrame(columns=["uniqueID", "userName", "room", "floor", "status", "entry_time", "exit_time"])
+# ✅ Store active WebSocket connections
+active_connections = set()
 
-app.state.data_store = DataStore()
-
-# ✅ Route to Submit Data
-@app.post("/submit-data")
-async def submit_data(data: dict):
-    """ Accepts JSON & stores worker entry/exit times in a DataFrame """
-    df = app.state.data_store.df  # Access persistent DataFrame
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """ Handles WebSocket connections from both Android App & Web Clients """
+    await websocket.accept()
+    active_connections.add(websocket)
+    print("✅ WebSocket connection established.")
 
     try:
-        uniqueID = data.get("uniqueID")
-        userName = data.get("userName")
-        room = data.get("room")
-        floor = data.get("floor")
-        status = data.get("status")  # "Enter" or "Exit"
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        while True:
+            data = await websocket.receive_text()
+            print(f"📩 Received Data: {data}")  # Debugging log
 
-        if None in [uniqueID, userName, room, floor, status]:
-            raise HTTPException(status_code=400, detail="Missing required fields")
+            # Broadcast data to all connected web clients
+            for connection in active_connections:
+                await connection.send_text(data)
 
-        # Check if the worker already has an entry
-        existing_entry = df[(df["uniqueID"] == uniqueID) & (df["exit_time"] == "")]
+    except WebSocketDisconnect:
+        print("⚠️ Client disconnected")
+        active_connections.remove(websocket)
 
-        if status.lower() == "enter":
-            if existing_entry.empty:
-                new_entry = pd.DataFrame([[uniqueID, userName, room, floor, status, current_time, ""]], 
-                                         columns=df.columns)
-                df = pd.concat([df, new_entry], ignore_index=True)
+# ✅ Optional: Allow Android to Send Data via HTTP (Instead of WebSockets)
+@app.post("/submit-data")
+async def submit_data(data: dict):
+    """ Receives JSON data and sends it to all WebSocket clients """
+    json_data = json.dumps(data)  # Convert to JSON
 
-        elif status.lower() == "exit":
-            if not existing_entry.empty:
-                df.loc[df["uniqueID"] == uniqueID, "exit_time"] = current_time
+    # ✅ Send data to all connected WebSocket clients
+    for connection in active_connections:
+        await connection.send_text(json_data)
 
-        # ✅ Debug: Print Updated DataFrame
-        print("📂 Updated DataFrame:")
-        print(df)
+    return {"message": "Data sent to web clients"}
 
-        return {"message": f"Worker {status} recorded successfully"}
-
-    except Exception as e:
-        print("❌ Error:", e)
-        raise HTTPException(status_code=400, detail=str(e))
-
-# ✅ Retrieve Labour Data for Display
-@app.get("/get-labour-data")
-async def get_labour_data():
-    """ Fetch all worker tracking data from DataFrame """
-    df = app.state.data_store.df  # Access persistent DataFrame
-    if df.empty:
-        return {"message": "No data available"}
-    
-    return {"labour_records": df.to_dict(orient="records")}
-
-# ✅ Serve HTML Page
+# ✅ Serve Web Page
 @app.get("/")
 async def home():
     html_content = """
@@ -70,53 +48,36 @@ async def home():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Labour Tracking System</title>
+        <title>Live Labour Tracking</title>
         <script>
             document.addEventListener("DOMContentLoaded", function () {
-                function fetchAndUpdate() {
-                    fetch("/get-labour-data")
-                        .then(response => response.json())
-                        .then(data => {
-                            let tableBody = document.getElementById("tableBody");
-                            tableBody.innerHTML = ""; // Clear previous entries
-                            if (data.labour_records) {
-                                data.labour_records.forEach(entry => {
-                                    let row = `<tr>
-                                        <td>${entry.uniqueID}</td>
-                                        <td>${entry.userName}</td>
-                                        <td>${entry.room}</td>
-                                        <td>${entry.floor}</td>
-                                        <td>${entry.status}</td>
-                                        <td>${entry.entry_time ? entry.entry_time : 'Pending'}</td>
-                                        <td>${entry.exit_time ? entry.exit_time : 'Still Inside'}</td>
-                                    </tr>`;
-                                    tableBody.innerHTML += row;
-                                });
-                            }
-                        })
-                        .catch(err => console.error("Error fetching data:", err));
-                }
+                const tableBody = document.getElementById("tableBody");
+                const ws = new WebSocket("wss://" + window.location.host + "/ws");
 
-                setInterval(fetchAndUpdate, 2000);
+                ws.onmessage = function(event) {
+                    let data = JSON.parse(event.data);
+                    let row = `<tr>
+                        <td>${data.uniqueID}</td>
+                        <td>${data.userName}</td>
+                        <td>${data.room}</td>
+                        <td>${data.floor}</td>
+                        <td>${data.status}</td>
+                        <td>${new Date().toLocaleString()}</td>
+                    </tr>`;
+                    tableBody.innerHTML = row + tableBody.innerHTML; // Add new data at the top
+                };
+
+                ws.onclose = () => console.log("⚠️ WebSocket connection closed.");
             });
         </script>
         <style>
-            table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            th, td {
-                border: 1px solid black;
-                padding: 8px;
-                text-align: center;
-            }
-            th {
-                background-color: lightgray;
-            }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid black; padding: 8px; text-align: center; }
+            th { background-color: lightgray; }
         </style>
     </head>
     <body>
-        <h1>Labour Tracking System</h1>
+        <h1>Live Labour Tracking</h1>
         <table>
             <thead>
                 <tr>
@@ -125,12 +86,11 @@ async def home():
                     <th>Room</th>
                     <th>Floor</th>
                     <th>Status</th>
-                    <th>Entry Time</th>
-                    <th>Exit Time</th>
+                    <th>Received Time</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
-                <tr><td colspan="7">Waiting for data...</td></tr>
+                <tr><td colspan="6">Waiting for data...</td></tr>
             </tbody>
         </table>
     </body>
