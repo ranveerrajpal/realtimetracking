@@ -42,7 +42,7 @@ async def websocket_endpoint(websocket: WebSocket):
 async def submit_data(uniqueID: str, userName: str, room: str, floor: int, status: str):
     try:
         # Append the data to the CSV file
-        new_data = pd.DataFrame([[unique_id, name, longitude, latitude, floor]], 
+        new_data = pd.DataFrame([[uniqueID, userName, room, floor, status]], 
                                  columns=["uniqueID", "userName", "room", "floor", "status"])
         new_data.to_csv(csv_file, mode='a', header=False, index=False)
         
