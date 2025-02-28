@@ -19,7 +19,32 @@ if not os.path.exists(csv_file):
     df = pd.DataFrame(columns=["uniqueID", "userName", "room", "floor", "status"])
     df.to_csv(csv_file, index=False)
 
-# Retrieve CSV Data API
+# ✅ Route to Submit Data
+@app.post("/submit-data")
+async def submit_data(data: dict):
+    """ Accepts JSON & stores data in CSV """
+    try:
+        uniqueID = data.get("uniqueID")
+        userName = data.get("userName")
+        room = data.get("room")
+        floor = data.get("floor")
+        status = data.get("status")
+
+        # Validate required fields
+        if None in [uniqueID, userName, room, floor, status]:
+            raise HTTPException(status_code=400, detail="Missing required fields")
+
+        # Append data to CSV
+        new_data = pd.DataFrame([[uniqueID, userName, room, floor, status]], 
+                                 columns=["uniqueID", "userName", "room", "floor", "status"])
+        new_data.to_csv(csv_file, mode='a', header=False, index=False)
+
+        return {"message": "Data received successfully"}
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ✅ Retrieve CSV Data for Animation
 @app.get("/get-csv-data")
 async def get_csv_data():
     """ Fetch all CSV entries for animation """
@@ -31,7 +56,7 @@ async def get_csv_data():
     else:
         raise HTTPException(status_code=404, detail="CSV file not found")
 
-# Serve HTML Page
+# ✅ Serve HTML Page
 @app.get("/")
 async def home():
     html_content = """
