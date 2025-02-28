@@ -2,60 +2,63 @@ document.addEventListener("DOMContentLoaded", function () {
     const canvas = document.getElementById("floorCanvas");
     const ctx = canvas.getContext("2d");
 
-    let users = {}; // Store user locations
+    // Define room positions on the canvas
+    const rooms = {
+        "Room 1": { x: 100, y: 250 },
+        "Room 2": { x: 300, y: 250 },
+        "Room 3": { x: 100, y: 100 },
+        "Room 4": { x: 300, y: 100 }
+    };
 
-    // WebSocket Setup
-    const ws = new WebSocket("wss://your-app-name.onrender.com/ws");
+    // WebSocket connection
+    const socket = new WebSocket("wss://realtimetracking-zcq4.onrender.com/ws");
 
-    ws.onmessage = function (event) {
+    socket.onopen = () => {
+        console.log("WebSocket connection established");
+    };
+
+    socket.onmessage = (event) => {
+        console.log("Received:", event.data);
         const data = JSON.parse(event.data);
-        users[data.unique_id] = { room_no: data.room_no };
-        drawFloorPlan();
 
-        // Update 3D Position
-        const userDot = document.getElementById("userDot");
-        if (data.room_no === 101) {
-            userDot.setAttribute("position", "-1 0.2 -1");
-        } else if (data.room_no === 102) {
-            userDot.setAttribute("position", "1 0.2 -1");
+        if (data.room) {
+            update2DMap(data.room);
         }
+    };
+
+    socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+    };
+
+    socket.onclose = () => {
+        console.log("WebSocket connection closed");
     };
 
     function drawFloorPlan() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Corridor
-        ctx.fillStyle = "gray";
-        ctx.fillRect(200, 150, 100, 200);
+        // Draw rooms
+        ctx.fillStyle = "lightgray";
+        ctx.fillRect(50, 200, 150, 150);  // Room 1
+        ctx.fillRect(250, 200, 150, 150); // Room 2
+        ctx.fillRect(50, 50, 150, 150);   // Room 3
+        ctx.fillRect(250, 50, 150, 150);  // Room 4
 
-        // Room 101 (Left)
-        ctx.fillStyle = "lightblue";
-        ctx.fillRect(50, 150, 150, 200);
+        // Label rooms
         ctx.fillStyle = "black";
-        ctx.fillText("Room 101", 90, 180);
+        ctx.fillText("Room 1", 100, 275);
+        ctx.fillText("Room 2", 300, 275);
+        ctx.fillText("Room 3", 100, 125);
+        ctx.fillText("Room 4", 300, 125);
+    }
 
-        // Room 102 (Top Right at 90 degrees)
-        ctx.fillStyle = "lightgreen";
-        ctx.fillRect(200, 50, 200, 100);
-        ctx.fillStyle = "black";
-        ctx.fillText("Room 102", 260, 80);
+    function update2DMap(room) {
+        drawFloorPlan(); // Redraw the floor plan
 
-        // Draw Blue Dots
-        for (let userId in users) {
-            let user = users[userId];
-            let x, y;
-
-            if (user.room_no === 101) {
-                x = 100;
-                y = 250;
-            } else if (user.room_no === 102) {
-                x = 250;
-                y = 75;
-            }
-
+        if (rooms[room]) {
             ctx.fillStyle = "blue";
             ctx.beginPath();
-            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.arc(rooms[room].x, rooms[room].y, 10, 0, 2 * Math.PI);
             ctx.fill();
         }
     }
