@@ -53,18 +53,24 @@ async def home():
             document.addEventListener("DOMContentLoaded", function () {
                 const tableBody = document.getElementById("tableBody");
                 const ws = new WebSocket("wss://" + window.location.host + "/ws");
+                let receivedEntries = new Set(); // ✅ Store unique data
 
                 ws.onmessage = function(event) {
                     let data = JSON.parse(event.data);
-                    let row = `<tr>
-                        <td>${data.uniqueID}</td>
-                        <td>${data.userName}</td>
-                        <td>${data.room}</td>
-                        <td>${data.floor}</td>
-                        <td>${data.status}</td>
-                        <td>${new Date().toLocaleString()}</td>
-                    </tr>`;
-                    tableBody.innerHTML = row + tableBody.innerHTML; // Add new data at the top
+                    let entryKey = `${data.uniqueID}-${data.userName}-${data.room}-${data.floor}-${data.status}`; // Unique Key
+
+                    if (!receivedEntries.has(entryKey)) { // ✅ Only add if it's new
+                        receivedEntries.add(entryKey);
+                        let row = `<tr>
+                            <td>${data.uniqueID}</td>
+                            <td>${data.userName}</td>
+                            <td>${data.room}</td>
+                            <td>${data.floor}</td>
+                            <td>${data.status}</td>
+                            <td>${new Date().toLocaleString()}</td>
+                        </tr>`;
+                        tableBody.innerHTML = row + tableBody.innerHTML; // Add new data at the top
+                    }
                 };
 
                 ws.onclose = () => console.log("⚠️ WebSocket connection closed.");
