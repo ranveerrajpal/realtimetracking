@@ -36,7 +36,8 @@ async def websocket_endpoint(websocket: WebSocket):
             user_data = json.loads(data)
 
             # Extract details
-            uniqueIDid = user_data["unique_id"]
+            uniqueID = user_data["uniqueID"]
+            userName = user_data["userName"]
             room = user_data["room"]
             floor = user_data["floor"]
             status = user_data["status"]
