@@ -31,7 +31,7 @@ with open(html_file_path, "r") as file:
 async def home():
     return HTMLResponse(html_content)
 
-@app.websocket("/ws")
+@app.post("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
