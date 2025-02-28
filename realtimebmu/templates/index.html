@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Room Tracking</title>
+    <script src="static/app.js"></script>
+    <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+    <h1>Real-Time Room Presence</h1>
+
+    <!-- 2D Canvas -->
+    <h2>2D Floor Plan</h2>
+    <canvas id="floorCanvas" width="500" height="500"></canvas>
+
+    <!-- 3D Visualization -->
+    <h2>3D Floor Model</h2>
+    <a-scene embedded>
+        <!-- Floor -->
+        <a-box position="0 0 0" width="4" height="0.1" depth="4" color="gray"></a-box>
+
+        <!-- Room 101 -->
+        <a-box position="-1 0.5 -1" width="1.5" height="1" depth="1.5" color="lightblue"></a-box>
+
+        <!-- Room 102 -->
+        <a-box position="1 0.5 -1" width="1.5" height="1" depth="1.5" color="lightgreen"></a-box>
+
+        <!-- Blue Dot (Tracked Person) -->
+        <a-sphere id="userDot" position="0 0.2 0" radius="0.1" color="blue"></a-sphere>
+    </a-scene>
+</body>
+</html>
