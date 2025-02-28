@@ -9,15 +9,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
     console.log("🚀 Initializing 2D Map...");
 
-    // Define room positions on the canvas (adjust as needed)
+    // Define room positions on the canvas
     const rooms = {
-        "Room 1": { x: 125, y: 275 },  // Center of Room 1
-        "Room 2": { x: 325, y: 275 },  // Center of Room 2
-        "Room 3": { x: 125, y: 125 },  // Center of Room 3
-        "Room 4": { x: 325, y: 125 }   // Center of Room 4
+        "Room 1": { x: 125, y: 275 },
+        "Room 2": { x: 325, y: 275 },
+        "Room 3": { x: 125, y: 125 },
+        "Room 4": { x: 325, y: 125 }
     };
 
-    // WebSocket connection
+    // WebSocket Connection
     const socket = new WebSocket("wss://realtimetracking-zcq4.onrender.com/ws");
 
     socket.onopen = () => {
@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("📩 Received Data:", event.data);
         try {
             const data = JSON.parse(event.data);
+
             if (data.room && rooms[data.room]) {
                 console.log(`🚀 Updating dot for: ${data.room}`);
                 update2DMap(data.room);
@@ -47,33 +48,26 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("⚠️ WebSocket connection closed.");
     };
 
-    // Function to draw the floor plan with labeled rooms
     function drawFloorPlan() {
         console.log("🖼️ Redrawing Floor Plan...");
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Set background color for debugging
-        ctx.fillStyle = "yellow";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw rooms with borders
         ctx.fillStyle = "lightgray";
-        ctx.strokeStyle = "red"; // Red border for debugging
+        ctx.strokeStyle = "red";
         ctx.lineWidth = 2;
 
-        ctx.fillRect(50, 200, 150, 150);  // Room 1
-        ctx.strokeRect(50, 200, 150, 150); // Debug border
+        ctx.fillRect(50, 200, 150, 150);
+        ctx.strokeRect(50, 200, 150, 150);
 
-        ctx.fillRect(250, 200, 150, 150); // Room 2
+        ctx.fillRect(250, 200, 150, 150);
         ctx.strokeRect(250, 200, 150, 150);
 
-        ctx.fillRect(50, 50, 150, 150);   // Room 3
+        ctx.fillRect(50, 50, 150, 150);
         ctx.strokeRect(50, 50, 150, 150);
 
-        ctx.fillRect(250, 50, 150, 150);  // Room 4
+        ctx.fillRect(250, 50, 150, 150);
         ctx.strokeRect(250, 50, 150, 150);
 
-        // Label rooms
         ctx.fillStyle = "black";
         ctx.font = "16px Arial";
         ctx.fillText("Room 1", 100, 275);
@@ -82,9 +76,8 @@ document.addEventListener("DOMContentLoaded", function () {
         ctx.fillText("Room 4", 300, 125);
     }
 
-    // Function to update the dot position based on received room data
     function update2DMap(room) {
-        drawFloorPlan(); // Redraw floor plan before placing new dot
+        drawFloorPlan();
 
         if (rooms[room]) {
             ctx.fillStyle = "blue";
@@ -97,6 +90,5 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Initial drawing of the floor plan
     drawFloorPlan();
 });
