@@ -7,7 +7,7 @@ import os
 
 app = FastAPI()
 
-# Mount static files for JavaScript & CSS
+# Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # CSV File
@@ -18,18 +18,93 @@ if not os.path.exists(csv_file):
     df = pd.DataFrame(columns=["uniqueID", "userName", "room", "floor", "status"])
     df.to_csv(csv_file, index=False)
 
-# Load HTML
-with open("templates/index.html", "r") as file:
-    html_content = file.read()
-
 # Store active WebSocket connections
 active_connections = set()
 
 @app.get("/")
 async def home():
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Real-Time Room Tracking</title>
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                const canvas = document.getElementById("floorCanvas");
+                const ctx = canvas.getContext("2d");
+
+                const rooms = {
+                    "Room 1": { x: 125, y: 275 },
+                    "Room 2": { x: 325, y: 275 },
+                    "Room 3": { x: 125, y: 125 },
+                    "Room 4": { x: 325, y: 125 }
+                };
+
+                function drawFloorPlan() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = "lightgray";
+                    ctx.strokeStyle = "red";
+                    ctx.lineWidth = 2;
+
+                    ctx.fillRect(50, 200, 150, 150);
+                    ctx.strokeRect(50, 200, 150, 150);
+
+                    ctx.fillRect(250, 200, 150, 150);
+                    ctx.strokeRect(250, 200, 150, 150);
+
+                    ctx.fillRect(50, 50, 150, 150);
+                    ctx.strokeRect(50, 50, 150, 150);
+
+                    ctx.fillRect(250, 50, 150, 150);
+                    ctx.strokeRect(250, 50, 150, 150);
+
+                    ctx.fillStyle = "black";
+                    ctx.font = "16px Arial";
+                    ctx.fillText("Room 1", 100, 275);
+                    ctx.fillText("Room 2", 300, 275);
+                    ctx.fillText("Room 3", 100, 125);
+                    ctx.fillText("Room 4", 300, 125);
+                }
+
+                async function fetchAndUpdate() {
+                    try {
+                        const response = await fetch("/latest-positions");
+                        const data = await response.json();
+
+                        if (data.positions) {
+                            drawFloorPlan();
+
+                            data.positions.forEach((entry) => {
+                                if (rooms[entry.room]) {
+                                    ctx.fillStyle = "blue";
+                                    ctx.beginPath();
+                                    ctx.arc(rooms[entry.room].x, rooms[entry.room].y, 10, 0, 2 * Math.PI);
+                                    ctx.fill();
+                                    console.log(`✅ Dot placed in ${entry.room} at (${rooms[entry.room].x}, ${rooms[entry.room].y})`);
+                                }
+                            });
+                        }
+                    } catch (error) {
+                        console.error("Error fetching positions:", error);
+                    }
+                }
+
+                setInterval(fetchAndUpdate, 2000);
+                drawFloorPlan();
+            });
+        </script>
+    </head>
+    <body>
+        <h1>Real-Time Room Tracking</h1>
+        <canvas id="floorCanvas" width="500" height="500"></canvas>
+    </body>
+    </html>
+    """
     return HTMLResponse(html_content)
 
-# WebSocket Endpoint (Now broadcasts data to all connected clients)
+# WebSocket Endpoint (Broadcasts received data to all clients)
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -42,18 +117,15 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 json_data = json.loads(data)
 
-                # Extract required fields
                 required_fields = ["uniqueID", "userName", "room", "floor", "status"]
                 if not all(field in json_data for field in required_fields):
                     await websocket.send_text(json.dumps({"error": "Missing required fields"}))
                     continue
 
-                # Append data to CSV
                 new_data = pd.DataFrame([[json_data["uniqueID"], json_data["userName"], json_data["room"], json_data["floor"], json_data["status"]]], 
                                         columns=required_fields)
                 new_data.to_csv(csv_file, mode='a', header=False, index=False)
 
-                # Broadcast data to all connected clients
                 for connection in active_connections:
                     await connection.send_text(json.dumps(json_data))
 
@@ -66,9 +138,10 @@ async def websocket_endpoint(websocket: WebSocket):
         print("⚠️ Client disconnected")
         active_connections.remove(websocket)
 
-# HTTP POST API Endpoint (Accepts JSON & stores data in CSV)
+# ✅ HTTP POST API Endpoint (Submit Data)
 @app.post("/submit-data")
 async def submit_data(data: dict):
+    """ Accepts JSON & stores data in CSV """
     try:
         # Extract fields from JSON payload
         uniqueID = data.get("uniqueID")
@@ -85,13 +158,12 @@ async def submit_data(data: dict):
         new_data = pd.DataFrame([[uniqueID, userName, room, floor, status]], 
                                  columns=["uniqueID", "userName", "room", "floor", "status"])
         new_data.to_csv(csv_file, mode='a', header=False, index=False)
-        
+
         return {"message": "Data received successfully"}
-    
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# API to Get Latest Positions from CSV
 @app.get("/latest-positions")
 async def get_latest_positions():
     """ Read the latest room positions from the CSV file. """
@@ -101,15 +173,14 @@ async def get_latest_positions():
         if df.empty:
             return {"message": "No tracking data available"}
 
-        latest_positions = df.groupby("uniqueID").last().reset_index()  # Get latest entry per user
-        positions = latest_positions.to_dict(orient="records")  # Convert to JSON format
+        latest_positions = df.groupby("uniqueID").last().reset_index()
+        positions = latest_positions.to_dict(orient="records")
 
         return {"positions": positions}
     
     else:
         raise HTTPException(status_code=404, detail="CSV file not found")
 
-# API to Get CSV File
 @app.get("/get-csv")
 async def get_csv():
     if os.path.exists(csv_file):
