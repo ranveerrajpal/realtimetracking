@@ -4,30 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Real-Time Room Tracking</title>
-    <script src="static/app.js"></script>
-    <link rel="stylesheet" href="static/style.css">
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const canvas = document.getElementById("floorCanvas");
+            const ctx = canvas.getContext("2d");
+
+            const rooms = {
+                "Room 1": { x: 125, y: 275 },
+                "Room 2": { x: 325, y: 275 },
+                "Room 3": { x: 125, y: 125 },
+                "Room 4": { x: 325, y: 125 }
+            };
+
+            function drawFloorPlan() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw rooms
+                ctx.fillStyle = "lightgray";
+                ctx.strokeStyle = "red";
+                ctx.lineWidth = 2;
+
+                ctx.fillRect(50, 200, 150, 150);
+                ctx.strokeRect(50, 200, 150, 150);
+
+                ctx.fillRect(250, 200, 150, 150);
+                ctx.strokeRect(250, 200, 150, 150);
+
+                ctx.fillRect(50, 50, 150, 150);
+                ctx.strokeRect(50, 50, 150, 150);
+
+                ctx.fillRect(250, 50, 150, 150);
+                ctx.strokeRect(250, 50, 150, 150);
+
+                ctx.fillStyle = "black";
+                ctx.font = "16px Arial";
+                ctx.fillText("Room 1", 100, 275);
+                ctx.fillText("Room 2", 300, 275);
+                ctx.fillText("Room 3", 100, 125);
+                ctx.fillText("Room 4", 300, 125);
+            }
+
+            async function fetchAndUpdate() {
+                try {
+                    const response = await fetch("/latest-positions");
+                    const data = await response.json();
+
+                    if (data.positions) {
+                        drawFloorPlan();
+
+                        data.positions.forEach((entry) => {
+                            if (rooms[entry.room]) {
+                                ctx.fillStyle = "blue";
+                                ctx.beginPath();
+                                ctx.arc(rooms[entry.room].x, rooms[entry.room].y, 10, 0, 2 * Math.PI);
+                                ctx.fill();
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error("Error fetching positions:", error);
+                }
+            }
+
+            // Fetch data every 2 seconds
+            setInterval(fetchAndUpdate, 2000);
+
+            drawFloorPlan();
+        });
+    </script>
 </head>
 <body>
-    <h1>Real-Time Room Presence</h1>
-
-    <!-- 2D Canvas -->
-    <h2>2D Floor Plan</h2>
+    <h1>Real-Time Room Tracking</h1>
     <canvas id="floorCanvas" width="500" height="500"></canvas>
-
-    <!-- 3D Visualization -->
-    <h2>3D Floor Model</h2>
-    <a-scene embedded>
-        <!-- Floor -->
-        <a-box position="0 0 0" width="4" height="0.1" depth="4" color="gray"></a-box>
-
-        <!-- Room 101 -->
-        <a-box position="-1 0.5 -1" width="1.5" height="1" depth="1.5" color="lightblue"></a-box>
-
-        <!-- Room 102 -->
-        <a-box position="1 0.5 -1" width="1.5" height="1" depth="1.5" color="lightgreen"></a-box>
-
-        <!-- Blue Dot (Tracked Person) -->
-        <a-sphere id="userDot" position="0 0.2 0" radius="0.1" color="blue"></a-sphere>
-    </a-scene>
 </body>
 </html>
