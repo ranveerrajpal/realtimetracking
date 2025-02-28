@@ -10,8 +10,7 @@ app = FastAPI()
 # Mount static files for JavaScript & CSS
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Allowed Floor
-ALLOWED_FLOOR = 1
+# CSV File
 csv_file = "data.csv"
 
 # Ensure CSV file exists
@@ -23,14 +22,14 @@ if not os.path.exists(csv_file):
 with open("templates/index.html", "r") as file:
     html_content = file.read()
 
+# Store active WebSocket connections
+active_connections = set()
+
 @app.get("/")
 async def home():
     return HTMLResponse(html_content)
 
-# WebSocket Endpoint (Now receives JSON properly)
-active_connections = set()
-csv_file = "data.csv"
-
+# WebSocket Endpoint (Now broadcasts data to all connected clients)
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -41,7 +40,7 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_text()
             try:
-                json_data = json.loads(data)  # Parse JSON
+                json_data = json.loads(data)
 
                 # Extract required fields
                 required_fields = ["uniqueID", "userName", "room", "floor", "status"]
@@ -49,18 +48,12 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_text(json.dumps({"error": "Missing required fields"}))
                     continue
 
-                uniqueID = json_data["uniqueID"]
-                userName = json_data["userName"]
-                room = json_data["room"]
-                floor = json_data["floor"]
-                status = json_data["status"]
-
                 # Append data to CSV
-                new_data = pd.DataFrame([[uniqueID, userName, room, floor, status]], 
+                new_data = pd.DataFrame([[json_data["uniqueID"], json_data["userName"], json_data["room"], json_data["floor"], json_data["status"]]], 
                                         columns=required_fields)
                 new_data.to_csv(csv_file, mode='a', header=False, index=False)
 
-                # Send real-time updates to all connected clients
+                # Broadcast data to all connected clients
                 for connection in active_connections:
                     await connection.send_text(json.dumps(json_data))
 
@@ -97,6 +90,24 @@ async def submit_data(data: dict):
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# API to Get Latest Positions from CSV
+@app.get("/latest-positions")
+async def get_latest_positions():
+    """ Read the latest room positions from the CSV file. """
+    if os.path.exists(csv_file):
+        df = pd.read_csv(csv_file)
+
+        if df.empty:
+            return {"message": "No tracking data available"}
+
+        latest_positions = df.groupby("uniqueID").last().reset_index()  # Get latest entry per user
+        positions = latest_positions.to_dict(orient="records")  # Convert to JSON format
+
+        return {"positions": positions}
+    
+    else:
+        raise HTTPException(status_code=404, detail="CSV file not found")
 
 # API to Get CSV File
 @app.get("/get-csv")
