@@ -10,10 +10,10 @@
             const ctx = canvas.getContext("2d");
 
             const rooms = {
-                "Room 1": { x: 125, y: 275 },
-                "Room 2": { x: 325, y: 275 },
-                "Room 3": { x: 125, y: 125 },
-                "Room 4": { x: 325, y: 125 }
+                "Room1": { x: 125, y: 275 },
+                "Room2": { x: 325, y: 275 },
+                "Room3": { x: 125, y: 125 },
+                "Room4": { x: 325, y: 125 }
             };
 
             function drawFloorPlan() {
@@ -38,10 +38,10 @@
 
                 ctx.fillStyle = "black";
                 ctx.font = "16px Arial";
-                ctx.fillText("Room 1", 100, 275);
-                ctx.fillText("Room 2", 300, 275);
-                ctx.fillText("Room 3", 100, 125);
-                ctx.fillText("Room 4", 300, 125);
+                ctx.fillText("Room1", 100, 275);
+                ctx.fillText("Room2", 300, 275);
+                ctx.fillText("Room3", 100, 125);
+                ctx.fillText("Room4", 300, 125);
             }
 
             async function fetchAndUpdate() {
