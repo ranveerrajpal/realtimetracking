@@ -5,14 +5,17 @@ import datetime
 
 app = FastAPI()
 
-# ✅ Initialize an empty DataFrame
-df = pd.DataFrame(columns=["uniqueID", "userName", "room", "floor", "status", "entry_time", "exit_time"])
+# ✅ Persistent DataFrame using app state
+class DataStore:
+    df = pd.DataFrame(columns=["uniqueID", "userName", "room", "floor", "status", "entry_time", "exit_time"])
+
+app.state.data_store = DataStore()
 
 # ✅ Route to Submit Data
 @app.post("/submit-data")
 async def submit_data(data: dict):
     """ Accepts JSON & stores worker entry/exit times in a DataFrame """
-    global df  # Access the DataFrame globally
+    df = app.state.data_store.df  # Access persistent DataFrame
 
     try:
         uniqueID = data.get("uniqueID")
@@ -22,35 +25,37 @@ async def submit_data(data: dict):
         status = data.get("status")  # "Enter" or "Exit"
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Validate required fields
         if None in [uniqueID, userName, room, floor, status]:
             raise HTTPException(status_code=400, detail="Missing required fields")
 
         # Check if the worker already has an entry
-        existing_entry = df[(df["uniqueID"] == uniqueID) & (df["exit_time"].isna())]
+        existing_entry = df[(df["uniqueID"] == uniqueID) & (df["exit_time"] == "")]
 
         if status.lower() == "enter":
             if existing_entry.empty:
-                # Add new entry with entry time
                 new_entry = pd.DataFrame([[uniqueID, userName, room, floor, status, current_time, ""]], 
                                          columns=df.columns)
                 df = pd.concat([df, new_entry], ignore_index=True)
 
         elif status.lower() == "exit":
             if not existing_entry.empty:
-                # Update the latest entry with exit time
                 df.loc[df["uniqueID"] == uniqueID, "exit_time"] = current_time
+
+        # ✅ Debug: Print Updated DataFrame
+        print("📂 Updated DataFrame:")
+        print(df)
 
         return {"message": f"Worker {status} recorded successfully"}
 
     except Exception as e:
+        print("❌ Error:", e)
         raise HTTPException(status_code=400, detail=str(e))
 
 # ✅ Retrieve Labour Data for Display
 @app.get("/get-labour-data")
 async def get_labour_data():
     """ Fetch all worker tracking data from DataFrame """
-    global df  # Access the DataFrame globally
+    df = app.state.data_store.df  # Access persistent DataFrame
     if df.empty:
         return {"message": "No data available"}
     
