@@ -4,55 +4,59 @@ from fastapi.staticfiles import StaticFiles
 import pandas as pd
 import json
 import os
-import time
+import datetime
 
 app = FastAPI()
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# CSV File
-csv_file = "data.csv"
+# CSV File for storing labour tracking
+csv_file = "labour_tracking.csv"
 
 # Ensure CSV file exists
 if not os.path.exists(csv_file):
-    df = pd.DataFrame(columns=["uniqueID", "userName", "room", "floor", "status"])
+    df = pd.DataFrame(columns=["uniqueID", "userName", "floor", "entry_time", "exit_time"])
     df.to_csv(csv_file, index=False)
 
-# ✅ Route to Submit Data
+# ✅ Route to Submit Labour Tracking Data
 @app.post("/submit-data")
 async def submit_data(data: dict):
-    """ Accepts JSON & stores data in CSV """
+    """ Accepts JSON & stores worker entry/exit time """
     try:
         uniqueID = data.get("uniqueID")
         userName = data.get("userName")
-        room = data.get("room")
         floor = data.get("floor")
-        status = data.get("status")
+        status = data.get("status")  # "Enter" or "Exit"
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Validate required fields
-        if None in [uniqueID, userName, room, floor, status]:
+        if None in [uniqueID, userName, floor, status]:
             raise HTTPException(status_code=400, detail="Missing required fields")
 
-        # Append data to CSV
-        new_data = pd.DataFrame([[uniqueID, userName, room, floor, status]], 
-                                 columns=["uniqueID", "userName", "room", "floor", "status"])
-        new_data.to_csv(csv_file, mode='a', header=False, index=False)
+        df = pd.read_csv(csv_file)
 
-        return {"message": "Data received successfully"}
+        if status == "Enter":
+            # Add new entry with entry time
+            new_data = pd.DataFrame([[uniqueID, userName, floor, current_time, ""]], 
+                                    columns=["uniqueID", "userName", "floor", "entry_time", "exit_time"])
+            df = pd.concat([df, new_data], ignore_index=True)
+        elif status == "Exit":
+            # Update the latest entry with exit time
+            df.loc[(df["uniqueID"] == uniqueID) & (df["exit_time"] == ""), "exit_time"] = current_time
+
+        df.to_csv(csv_file, index=False)
+        return {"message": f"Worker {status} recorded successfully"}
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# ✅ Retrieve CSV Data for Animation
-@app.get("/get-csv-data")
-async def get_csv_data():
-    """ Fetch all CSV entries for animation """
+# ✅ Retrieve Labour Data for Display
+@app.get("/get-labour-data")
+async def get_labour_data():
+    """ Fetch all labour tracking data """
     if os.path.exists(csv_file):
         df = pd.read_csv(csv_file)
         if df.empty:
-            return {"message": "No tracking data available"}
-        return {"positions": df.to_dict(orient="records")}
+            return {"message": "No data available"}
+        return {"labour_records": df.to_dict(orient="records")}
     else:
         raise HTTPException(status_code=404, detail="CSV file not found")
 
@@ -65,90 +69,65 @@ async def home():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Animated Tracking</title>
+        <title>Labour Tracking System</title>
         <script>
             document.addEventListener("DOMContentLoaded", function () {
-                const canvas = document.getElementById("floorCanvas");
-                const ctx = canvas.getContext("2d");
-
-                const rooms = {
-                    "Room 1": { x: 125, y: 275 },
-                    "Room 2": { x: 325, y: 275 },
-                    "Room 3": { x: 125, y: 125 },
-                    "Room 4": { x: 325, y: 125 }
-                };
-
-                let currentPosition = { x: 125, y: 275 }; // Default start position
-
-                function drawFloorPlan() {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.fillStyle = "lightgray";
-                    ctx.strokeStyle = "red";
-                    ctx.lineWidth = 2;
-
-                    ctx.fillRect(50, 200, 150, 150);
-                    ctx.strokeRect(50, 200, 150, 150);
-
-                    ctx.fillRect(250, 200, 150, 150);
-                    ctx.strokeRect(250, 200, 150, 150);
-
-                    ctx.fillRect(50, 50, 150, 150);
-                    ctx.strokeRect(50, 50, 150, 150);
-
-                    ctx.fillRect(250, 50, 150, 150);
-                    ctx.strokeRect(250, 50, 150, 150);
-
-                    ctx.fillStyle = "black";
-                    ctx.font = "16px Arial";
-                    ctx.fillText("Room 1", 100, 275);
-                    ctx.fillText("Room 2", 300, 275);
-                    ctx.fillText("Room 3", 100, 125);
-                    ctx.fillText("Room 4", 300, 125);
-                }
-
-                function animateDot(targetX, targetY) {
-                    let dx = (targetX - currentPosition.x) / 10;
-                    let dy = (targetY - currentPosition.y) / 10;
-                    let steps = 10;
-                    
-                    function moveStep() {
-                        if (steps > 0) {
-                            currentPosition.x += dx;
-                            currentPosition.y += dy;
-                            steps--;
-                            drawFloorPlan();
-                            ctx.fillStyle = "blue";
-                            ctx.beginPath();
-                            ctx.arc(currentPosition.x, currentPosition.y, 10, 0, 2 * Math.PI);
-                            ctx.fill();
-                            requestAnimationFrame(moveStep);
-                        }
-                    }
-                    moveStep();
-                }
-
                 function fetchAndUpdate() {
-                    fetch("/get-csv-data")
+                    fetch("/get-labour-data")
                         .then(response => response.json())
                         .then(data => {
-                            if (data.positions && data.positions.length > 0) {
-                                let lastEntry = data.positions[data.positions.length - 1];
-                                if (rooms[lastEntry.room]) {
-                                    animateDot(rooms[lastEntry.room].x, rooms[lastEntry.room].y);
-                                }
+                            let tableBody = document.getElementById("tableBody");
+                            tableBody.innerHTML = ""; // Clear previous entries
+                            if (data.labour_records) {
+                                data.labour_records.forEach(entry => {
+                                    let row = `<tr>
+                                        <td>${entry.uniqueID}</td>
+                                        <td>${entry.userName}</td>
+                                        <td>${entry.floor}</td>
+                                        <td>${entry.entry_time}</td>
+                                        <td>${entry.exit_time ? entry.exit_time : 'Still Inside'}</td>
+                                    </tr>`;
+                                    tableBody.innerHTML += row;
+                                });
                             }
                         })
-                        .catch(err => console.error("Error fetching positions:", err));
+                        .catch(err => console.error("Error fetching data:", err));
                 }
 
                 setInterval(fetchAndUpdate, 2000);
-                drawFloorPlan();
             });
         </script>
+        <style>
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 8px;
+                text-align: center;
+            }
+            th {
+                background-color: lightgray;
+            }
+        </style>
     </head>
     <body>
-        <h1>Animated Real-Time Room Tracking</h1>
-        <canvas id="floorCanvas" width="500" height="500"></canvas>
+        <h1>Labour Tracking System</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Worker ID</th>
+                    <th>Name</th>
+                    <th>Floor</th>
+                    <th>Entry Time</th>
+                    <th>Exit Time</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="5">Waiting for data...</td></tr>
+            </tbody>
+        </table>
     </body>
     </html>
     """
