@@ -28,9 +28,15 @@ async def home():
     return HTMLResponse(html_content)
 
 # WebSocket Endpoint (Now receives JSON properly)
+active_connections = set()
+csv_file = "data.csv"
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()  # Accept WebSocket connection
+    await websocket.accept()
+    active_connections.add(websocket)
+    print("✅ WebSocket connection established.")
+
     try:
         while True:
             data = await websocket.receive_text()
@@ -38,29 +44,34 @@ async def websocket_endpoint(websocket: WebSocket):
                 json_data = json.loads(data)  # Parse JSON
 
                 # Extract required fields
-                uniqueID = json_data.get("uniqueID")
-                userName = json_data.get("userName")
-                room = json_data.get("room")
-                floor = json_data.get("floor")
-                status = json_data.get("status")
-
-                # Validate required fields
-                if None in [uniqueID, userName, room, floor, status]:
+                required_fields = ["uniqueID", "userName", "room", "floor", "status"]
+                if not all(field in json_data for field in required_fields):
                     await websocket.send_text(json.dumps({"error": "Missing required fields"}))
                     continue
-                
+
+                uniqueID = json_data["uniqueID"]
+                userName = json_data["userName"]
+                room = json_data["room"]
+                floor = json_data["floor"]
+                status = json_data["status"]
+
                 # Append data to CSV
                 new_data = pd.DataFrame([[uniqueID, userName, room, floor, status]], 
-                                        columns=["uniqueID", "userName", "room", "floor", "status"])
+                                        columns=required_fields)
                 new_data.to_csv(csv_file, mode='a', header=False, index=False)
 
-                await websocket.send_text(json.dumps({"message": "Data saved successfully"}))
-                
+                # Send real-time updates to all connected clients
+                for connection in active_connections:
+                    await connection.send_text(json.dumps(json_data))
+
+                print(f"📩 Data received & broadcasted: {json_data}")
+
             except json.JSONDecodeError:
                 await websocket.send_text(json.dumps({"error": "Invalid JSON format"}))
 
     except WebSocketDisconnect:
-        print("Client disconnected")
+        print("⚠️ Client disconnected")
+        active_connections.remove(websocket)
 
 # HTTP POST API Endpoint (Accepts JSON & stores data in CSV)
 @app.post("/submit-data")
