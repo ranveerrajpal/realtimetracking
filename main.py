@@ -19,7 +19,7 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             print(f"📩 Received Data: {data}")  # Debugging log
 
-            # Broadcast data to all connected web clients
+            # ✅ Broadcast data to all connected web clients
             for connection in active_connections:
                 await connection.send_text(data)
 
@@ -27,7 +27,7 @@ async def websocket_endpoint(websocket: WebSocket):
         print("⚠️ Client disconnected")
         active_connections.remove(websocket)
 
-# ✅ Optional: Allow Android to Send Data via HTTP (Instead of WebSockets)
+# ✅ Allow Android to Send Data via HTTP (Instead of WebSockets)
 @app.post("/submit-data")
 async def submit_data(data: dict):
     """ Receives JSON data and sends it to all WebSocket clients """
@@ -48,68 +48,90 @@ async def home():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Live Labour Tracking</title>
+        <title>Live Room Tracking</title>
         <script>
             document.addEventListener("DOMContentLoaded", function () {
-                const tableBody = document.getElementById("tableBody");
-                const notificationBox = document.getElementById("notificationBox");
                 const ws = new WebSocket("wss://" + window.location.host + "/ws");
-                let receivedEntries = new Set(); // ✅ Store unique data
+
+                // ✅ Canvas Setup
+                const canvas = document.getElementById("floorCanvas");
+                const ctx = canvas.getContext("2d");
+
+                let room1Occupied = false;
+                let room2Occupied = false;
+
+                function drawRooms() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // ✅ Draw Room 1
+                    ctx.fillStyle = "lightgray";
+                    ctx.fillRect(50, 100, 150, 150);
+                    ctx.strokeStyle = "black";
+                    ctx.strokeRect(50, 100, 150, 150);
+                    ctx.fillStyle = "black";
+                    ctx.fillText("Room 1", 100, 80);
+
+                    // ✅ Draw Room 2 (180° opposite)
+                    ctx.fillStyle = "lightgray";
+                    ctx.fillRect(250, 100, 150, 150);
+                    ctx.strokeStyle = "black";
+                    ctx.strokeRect(250, 100, 150, 150);
+                    ctx.fillStyle = "black";
+                    ctx.fillText("Room 2", 300, 80);
+
+                    // ✅ Draw Yellow Dot in Room 1 if occupied
+                    if (room1Occupied) {
+                        ctx.fillStyle = "yellow";
+                        ctx.beginPath();
+                        ctx.arc(125, 175, 10, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+
+                    // ✅ Draw Yellow Dot in Room 2 if occupied
+                    if (room2Occupied) {
+                        ctx.fillStyle = "yellow";
+                        ctx.beginPath();
+                        ctx.arc(325, 175, 10, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                }
 
                 ws.onmessage = function(event) {
                     let data = JSON.parse(event.data);
-                    let entryKey = `${data.uniqueID}-${data.userName}-${data.room}-${data.floor}-${data.status}`; // Unique Key
+                    console.log("📩 Data Received:", data);
 
-                    // ✅ Unauthorized Area Check
-                    let isUnauthorized = (data.userName.toLowerCase() === "nikhil" && (data.room === "Room 2" || data.floor == 2));
-
-                    if (isUnauthorized) {
-                        notificationBox.innerHTML = `<p style='color: red; font-weight: bold;'>⚠️ Alert: ${data.userName} entered an unauthorized area!</p>`;
+                    // ✅ If Room 1 is received, place a yellow dot
+                    if (data.room === "Room 1" && data.floor == 1) {
+                        room1Occupied = true;
+                        room2Occupied = false;
+                    }
+                    // ✅ If Room 2 is received, place a yellow dot
+                    else if (data.room === "Room 2" && data.floor == 1) {
+                        room1Occupied = false;
+                        room2Occupied = true;
+                    } else {
+                        room1Occupied = false;
+                        room2Occupied = false;
                     }
 
-                    if (!receivedEntries.has(entryKey)) { // ✅ Only add if it's new
-                        receivedEntries.add(entryKey);
-                        let rowColor = isUnauthorized ? "style='background-color: #ffcccc;'" : ""; // Highlight if unauthorized
-                        let row = `<tr ${rowColor}>
-                            <td>${data.uniqueID}</td>
-                            <td>${data.userName}</td>
-                            <td>${data.room}</td>
-                            <td>${data.floor}</td>
-                            <td>${data.status}</td>
-                            <td>${new Date().toLocaleString()}</td>
-                        </tr>`;
-                        tableBody.innerHTML = row + tableBody.innerHTML; // Add new data at the top
-                    }
+                    drawRooms(); // ✅ Update Canvas
                 };
 
                 ws.onclose = () => console.log("⚠️ WebSocket connection closed.");
+
+                drawRooms(); // ✅ Initial Draw
             });
         </script>
         <style>
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid black; padding: 8px; text-align: center; }
-            th { background-color: lightgray; }
-            #notificationBox { font-size: 18px; margin-bottom: 15px; }
+            canvas {
+                border: 2px solid black;
+                margin-top: 20px;
+            }
         </style>
     </head>
     <body>
-        <h1>Live Labour Tracking</h1>
-        <div id="notificationBox"></div> <!-- ✅ Notification Box -->
-        <table>
-            <thead>
-                <tr>
-                    <th>Worker ID</th>
-                    <th>Name</th>
-                    <th>Room</th>
-                    <th>Floor</th>
-                    <th>Status</th>
-                    <th>Received Time</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody">
-                <tr><td colspan="6">Waiting for data...</td></tr>
-            </tbody>
-        </table>
+        <h1>Live Room Tracking</h1>
+        <canvas id="floorCanvas" width="500" height="400"></canvas>
     </body>
     </html>
     """
