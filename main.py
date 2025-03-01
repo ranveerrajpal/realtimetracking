@@ -1,8 +1,18 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import json
 
 app = FastAPI()
+
+# ✅ Enable CORS to allow WebSocket connections from any browser
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ✅ Store active WebSocket connections
 active_connections = set()
@@ -51,7 +61,7 @@ async def home():
         <title>Live Room Tracking</title>
         <script>
             document.addEventListener("DOMContentLoaded", function () {
-                const ws = new WebSocket("wss//:realtimetracking-zcq4.onrender.com/ws");
+                const ws = new WebSocket("wss://realtimetracking-zcq4.onrender.com/ws");
 
                 // ✅ Canvas Setup
                 const canvas = document.getElementById("floorCanvas");
@@ -99,39 +109,44 @@ async def home():
                 }
 
                 ws.onmessage = function(event) {
-                    let data = JSON.parse(event.data);
-                    console.log("📩 Data Received:", data);
+                    try {
+                        let data = JSON.parse(event.data);
+                        console.log("📩 Data Received:", data);
 
-                    // ✅ Unique Key for Tracking
-                    let entryKey = `${data.uniqueID}-${data.userName}-${data.room}-${data.floor}-${data.status}`;
+                        // ✅ Unique Key for Tracking
+                        let entryKey = `${data.uniqueID}-${data.userName}-${data.room}-${data.floor}-${data.status}`;
 
-                    // ✅ Update Yellow Dots Based on Room Data
-                    if (data.room === "Room 1" && data.floor == 1) {
-                        room1Occupied = true;
-                        room2Occupied = false;
-                    } 
-                    else if (data.room === "Room 2" && data.floor == 1) {
-                        room1Occupied = false;
-                        room2Occupied = true;
-                    } else {
-                        room1Occupied = false;
-                        room2Occupied = false;
-                    }
+                        // ✅ Update Yellow Dots Based on Room Data
+                        if (data.room === "Room 1" && data.floor == 1) {
+                            room1Occupied = true;
+                            room2Occupied = false;
+                        } 
+                        else if (data.room === "Room 2" && data.floor == 1) {
+                            room1Occupied = false;
+                            room2Occupied = true;
+                        } else {
+                            room1Occupied = false;
+                            room2Occupied = false;
+                        }
 
-                    drawRooms(); // ✅ Update Canvas
+                        drawRooms(); // ✅ Update Canvas
 
-                    // ✅ Show Worker Details in Table
-                    if (!receivedEntries.has(entryKey)) { 
-                        receivedEntries.add(entryKey);
-                        let row = `<tr>
-                            <td>${data.uniqueID}</td>
-                            <td>${data.userName}</td>
-                            <td>${data.room}</td>
-                            <td>${data.floor}</td>
-                            <td>${data.status}</td>
-                            <td>${new Date().toLocaleString()}</td>
-                        </tr>`;
-                        tableBody.innerHTML = row + tableBody.innerHTML; // Add new data at the top
+                        // ✅ Show Worker Details in Table
+                        if (!receivedEntries.has(entryKey)) { 
+                            receivedEntries.add(entryKey);
+                            let row = `<tr>
+                                <td>${data.uniqueID}</td>
+                                <td>${data.userName}</td>
+                                <td>${data.room}</td>
+                                <td>${data.floor}</td>
+                                <td>${data.status}</td>
+                                <td>${new Date().toLocaleString()}</td>
+                            </tr>`;
+                            tableBody.innerHTML = row + tableBody.innerHTML; // Add new data at the top
+                        }
+
+                    } catch (error) {
+                        console.error("⚠️ Error parsing JSON:", error);
                     }
                 };
 
