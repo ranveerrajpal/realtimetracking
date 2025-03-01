@@ -1,0 +1,46 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <TextView
+        android:id="@+id/userInfoTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="20dp"
+        android:text="User Info: "
+        android:textSize="18sp" />
+
+    <Switch
+        android:id="@+id/sendDataSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/userInfoTextView"
+        android:layout_marginTop="10dp"
+        android:layout_marginStart="20dp"
+        android:text="Send Data"
+        android:minWidth="56dp"
+        android:minHeight="48dp"/>
+
+    <TextView
+        android:id="@+id/statusTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/sendDataSwitch"
+        android:layout_marginTop="10dp"
+        android:layout_marginStart="20dp"
+        android:text="Status: Unavailable"
+        android:textSize="16sp" />
+
+
+
+        <LinearLayout
+            android:id="@+id/deviceListLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+
+</RelativeLayout>
