@@ -51,7 +51,7 @@ async def home():
         <title>Live Room Tracking</title>
         <script>
             document.addEventListener("DOMContentLoaded", function () {
-                const ws = new WebSocket("wss://" + window.location.host + "/ws");
+                const ws = new WebSocket("wss://realtimetracking-zcq4.onrender.com/ws");
 
                 // ✅ Canvas Setup
                 const canvas = document.getElementById("floorCanvas");
