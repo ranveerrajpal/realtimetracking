@@ -59,6 +59,8 @@ async def home():
 
                 let room1Occupied = false;
                 let room2Occupied = false;
+                const tableBody = document.getElementById("tableBody");
+                let receivedEntries = new Set();
 
                 function drawRooms() {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -100,12 +102,14 @@ async def home():
                     let data = JSON.parse(event.data);
                     console.log("📩 Data Received:", data);
 
-                    // ✅ If Room 1 is received, place a yellow dot
+                    // ✅ Unique Key for Tracking
+                    let entryKey = `${data.uniqueID}-${data.userName}-${data.room}-${data.floor}-${data.status}`;
+
+                    // ✅ Update Yellow Dots Based on Room Data
                     if (data.room === "Room 1" && data.floor == 1) {
                         room1Occupied = true;
                         room2Occupied = false;
-                    }
-                    // ✅ If Room 2 is received, place a yellow dot
+                    } 
                     else if (data.room === "Room 2" && data.floor == 1) {
                         room1Occupied = false;
                         room2Occupied = true;
@@ -115,6 +119,20 @@ async def home():
                     }
 
                     drawRooms(); // ✅ Update Canvas
+
+                    // ✅ Show Worker Details in Table
+                    if (!receivedEntries.has(entryKey)) { 
+                        receivedEntries.add(entryKey);
+                        let row = `<tr>
+                            <td>${data.uniqueID}</td>
+                            <td>${data.userName}</td>
+                            <td>${data.room}</td>
+                            <td>${data.floor}</td>
+                            <td>${data.status}</td>
+                            <td>${new Date().toLocaleString()}</td>
+                        </tr>`;
+                        tableBody.innerHTML = row + tableBody.innerHTML; // Add new data at the top
+                    }
                 };
 
                 ws.onclose = () => console.log("⚠️ WebSocket connection closed.");
@@ -127,11 +145,30 @@ async def home():
                 border: 2px solid black;
                 margin-top: 20px;
             }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid black; padding: 8px; text-align: center; }
+            th { background-color: lightgray; }
         </style>
     </head>
     <body>
         <h1>Live Room Tracking</h1>
         <canvas id="floorCanvas" width="500" height="400"></canvas>
+        <h2>Worker Entry Details</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Worker ID</th>
+                    <th>Name</th>
+                    <th>Room</th>
+                    <th>Floor</th>
+                    <th>Status</th>
+                    <th>Received Time</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="6">Waiting for data...</td></tr>
+            </tbody>
+        </table>
     </body>
     </html>
     """
